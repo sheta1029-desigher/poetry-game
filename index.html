@@ -1,1 +1,310 @@
-file:///C:/Users/sheta/Downloads/code_artifact.html
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>古詩詞記憶大考驗</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .shake { animation: shake 0.5s; }
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+        .matched { background-color: #dcfce7 !important; border-color: #22c55e !important; color: #166534 !important; pointer-events: none; }
+        .wrong { background-color: #fee2e2 !important; border-color: #ef4444 !important; color: #991b1b !important; }
+        .selected { background-color: #fef08a !important; border-color: #eab308 !important; }
+        .keyword-highlight { display: inline-block; background-color: #ffedd5; color: #ea580c; font-weight: bold; padding: 0 4px; border-radius: 4px; }
+        
+        /* 徽章動畫 */
+        .badge-pop { animation: popIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.5) translateY(50px); }
+            100% { opacity: 1; transform: scale(1) translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen font-sans selection:bg-blue-200">
+    <div class="max-w-5xl mx-auto p-4 md:p-6">
+        
+        <!-- 標題與關卡切換 -->
+        <div class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 mb-4">📜 古詩詞大考驗</h1>
+            <div class="flex flex-wrap justify-center gap-2 md:gap-4">
+                <button onclick="loadLevel(1)" id="btn-level-1" class="px-4 py-2 rounded-full font-bold shadow-sm transition-all bg-blue-500 text-white hover:bg-blue-600">第一關：名句對對碰</button>
+                <button onclick="loadLevel(2)" id="btn-level-2" class="px-4 py-2 rounded-full font-bold shadow-sm transition-all bg-purple-100 text-purple-700 hover:bg-purple-200">第二關：月之意象</button>
+                <button onclick="loadLevel(3)" id="btn-level-3" class="px-4 py-2 rounded-full font-bold shadow-sm transition-all bg-rose-100 text-rose-700 hover:bg-rose-200">第三關：酒逢知己</button>
+            </div>
+            <p id="level-desc" class="mt-4 text-gray-600 font-medium text-lg"></p>
+        </div>
+
+        <!-- 遊戲主體 -->
+        <div class="flex flex-col md:flex-row gap-6 md:gap-12 relative">
+            <!-- 左側卡片區 -->
+            <div class="flex-1">
+                <h2 class="text-xl font-bold text-center mb-4 text-gray-700">上半句 / 詩詞原文</h2>
+                <div id="left-column" class="flex flex-col gap-3"></div>
+            </div>
+            
+            <!-- 右側卡片區 -->
+            <div class="flex-1">
+                <h2 class="text-xl font-bold text-center mb-4 text-gray-700">下半句 / 意象解碼</h2>
+                <div id="right-column" class="flex flex-col gap-3"></div>
+            </div>
+        </div>
+
+        <!-- 過關畫面覆蓋層 -->
+        <div id="victory-screen" class="fixed inset-0 bg-black/60 hidden items-center justify-center z-50 p-4">
+            <div class="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-2xl relative">
+                
+                <!-- 徽章區 (第三關專屬) -->
+                <div id="expert-badge" class="hidden justify-center mb-6 badge-pop">
+                    <svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="60" cy="60" r="50" fill="#EF4444" stroke="#FBBF24" stroke-width="6"/>
+                        <circle cx="60" cy="60" r="42" fill="#DC2626" stroke="#FDE68A" stroke-width="2" stroke-dasharray="4 4"/>
+                        <path d="M35 45L45 75H75L85 45H35Z" fill="#FEF3C7"/>
+                        <rect x="40" y="50" width="40" height="4" fill="#D97706"/>
+                        <rect x="40" y="60" width="40" height="4" fill="#D97706"/>
+                        <text x="60" y="95" font-size="14" font-weight="bold" fill="#FBBF24" text-anchor="middle">詩詞小專家</text>
+                        <path d="M60 20L65 30H55L60 20Z" fill="#FBBF24"/>
+                    </svg>
+                </div>
+                <!-- 一般Emoji區 -->
+                <div id="normal-emoji" class="text-6xl mb-4">🎉</div>
+                
+                <h3 id="victory-title" class="text-2xl font-bold text-gray-800 mb-2">太棒了！</h3>
+                <p id="victory-msg" class="text-gray-600 mb-6">您已完成本關挑戰！</p>
+                <button id="next-level-btn" class="w-full py-3 rounded-xl font-bold text-white bg-blue-500 hover:bg-blue-600 shadow-md transition-colors">
+                    前往下一關
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const levelsData = {
+            1: {
+                theme: 'blue',
+                desc: "請找出對應的詩詞下半句，把它們連起來吧！",
+                pairs: [
+                    { id: 1, left: "隨風潛入夜", right: "潤物細無聲", hint: "五年級・杜甫《春夜喜雨》" },
+                    { id: 2, left: "羌笛何須怨楊柳", right: "春風不度玉門關", hint: "五年級・王之渙《出塞》" },
+                    { id: 3, left: "滄海月明珠有淚", right: "藍田日暖玉生煙", hint: "五年級・李商隱《錦瑟》" },
+                    { id: 4, left: "咬定青山不放鬆", right: "立根原在破岩中", hint: "五年級・鄭板橋《竹石》" },
+                    { id: 5, left: "舉杯邀明月", right: "對影成三人", hint: "六年級・李白《月下獨酌》" },
+                    { id: 6, left: "人有悲歡離合", right: "月有陰晴圓缺", hint: "六年級・蘇軾《水調歌頭》" },
+                    { id: 7, left: "莫等閒、白了少年頭", right: "空悲切", hint: "六年級・岳飛《滿江紅》" },
+                    { id: 8, left: "三十功名塵與土", right: "八千里路雲和月", hint: "六年級・岳飛《滿江紅》" }
+                ]
+            },
+            2: {
+                theme: 'purple',
+                desc: "同是看著月亮，詩人的心情卻大不同。請配對正確的情感意象！",
+                pairs: [
+                    { id: 1, left: "舉杯邀<div class='keyword-highlight'>明月</div>，對影成三人", right: "想像與月亮、影子作伴，表現出極度的【孤獨與浪漫】", hint: "六年級・李白《月下獨酌》" },
+                    { id: 2, left: "人有悲歡離合，<div class='keyword-highlight'>月</div>有陰晴圓缺", right: "將月亮的圓缺比喻人生的聚散，充滿了【人生哲理的豁達】", hint: "六年級・蘇軾《水調歌頭》" },
+                    { id: 3, left: "但願人長久，千里共<div class='keyword-highlight'>嬋娟</div>", right: "雖然相隔兩地，但望著同一個月亮，傳遞了最深的【思念與祝福】", hint: "六年級・蘇軾《水調歌頭》" },
+                    { id: 4, left: "秦時<div class='keyword-highlight'>明月</div>漢時關", right: "月光照在古老的邊關，營造出歷史滄桑與戰士未歸的【邊塞征途感】", hint: "五年級・王昌齡《出塞》" },
+                    { id: 5, left: "滄海<div class='keyword-highlight'>月</div>明珠有淚", right: "海上的月光如淚珠般淒美，代表著一種【美好事物消逝的惘然與追憶】", hint: "五年級・李商隱《錦瑟》" },
+                    { id: 6, left: "<div class='keyword-highlight'>明月</div>樓高休獨倚", right: "高樓上的明月惹人思鄉，不敢獨自倚靠欄杆，帶有深深的【羈旅愁思】", hint: "六年級・范仲淹《蘇幕遮》" },
+                    { id: 7, left: "三十功名塵與土，八千里路雲和<div class='keyword-highlight'>月</div>", right: "月色伴隨著長途跋涉的征戰，展現出將軍收復山河的【壯志與豪情】", hint: "六年級・岳飛《滿江紅》" },
+                    { id: 8, left: "<div class='keyword-highlight'>月</div>落又烏啼。莫不是，無邊苦海，把西方哭碎", right: "月落的淒涼景象，用來看透世俗功名，表達一種【隱逸與看破紅塵】", hint: "五年級・鄭板橋《道情》" }
+                ]
+            },
+            3: {
+                theme: 'rose',
+                desc: "古人飲酒，有的狂喜、有的解愁。請找出詩句中「酒」代表的情感！",
+                pairs: [
+                    { id: 1, left: "花間一壺<div class='keyword-highlight'>酒</div>，獨酌無相親", right: "身邊無知己相伴，只能自己一個人在花叢間喝酒的【孤寂感】", hint: "六年級・李白《月下獨酌》" },
+                    { id: 2, left: "白日放歌須縱<div class='keyword-highlight'>酒</div>，青春作伴好還鄉", right: "聽到戰爭勝利的消息，高興得想喝酒唱歌的【極度狂喜】", hint: "五年級・杜甫《聞官軍收河南河北》" },
+                    { id: 3, left: "勸君更盡一杯<div class='keyword-highlight'>酒</div>，西出陽關無故人", right: "在送別的宴席上，對朋友即將遠行的【萬分不捨與珍重】", hint: "五年級・王維《渭城曲》" },
+                    { id: 4, left: "呼兒將出換美<div class='keyword-highlight'>酒</div>，與爾同銷萬古愁", right: "就算要把名貴的大衣拿去換酒也無所謂，展現出【豪放與借酒澆愁】", hint: "六年級・李白《將進酒》" },
+                    { id: 5, left: "把<div class='keyword-highlight'>酒</div>問青天。不知天上宮闕，今夕是何年", right: "端起酒杯質問天上的月宮，帶有一種想逃離現實的【迷惘與出世感】", hint: "六年級・蘇軾《水調歌頭》" },
+                    { id: 6, left: "<div class='keyword-highlight'>酒</div>入愁腸，化作相思淚", right: "本想借酒消愁，卻反而讓思鄉的眼淚流了下來的【深切愁苦】", hint: "六年級・范仲淹《蘇幕遮》" },
+                    { id: 7, left: "一曲新詞<div class='keyword-highlight'>酒</div>一杯，去年天氣舊亭台", right: "喝著酒聽著歌，感嘆時光飛逝、景物依舊但人事已非的【淡淡哀愁】", hint: "六年級・晏殊《浣溪沙》" },
+                    { id: 8, left: "歡言得所憩，美<div class='keyword-highlight'>酒</div>聊共揮", right: "與農家朋友相談甚歡，開心的一起舉杯暢飲的【閒適與快樂】", hint: "五年級・李白《下終南山過斛斯山人宿置酒》" }
+                ]
+            }
+        };
+
+        let currentLevel = 1;
+        let selectedLeft = null;
+        let selectedRight = null;
+        let matchedCount = 0;
+        let totalPairs = 0;
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function updateTabStyles() {
+            const tabs = [
+                {id: 1, btn: 'btn-level-1', active: 'bg-blue-500 text-white', inactive: 'bg-blue-100 text-blue-700'},
+                {id: 2, btn: 'btn-level-2', active: 'bg-purple-500 text-white', inactive: 'bg-purple-100 text-purple-700'},
+                {id: 3, btn: 'btn-level-3', active: 'bg-rose-500 text-white', inactive: 'bg-rose-100 text-rose-700'}
+            ];
+            
+            tabs.forEach(tab => {
+                const el = document.getElementById(tab.btn);
+                el.className = `px-4 py-2 rounded-full font-bold shadow-sm transition-all ${currentLevel === tab.id ? tab.active : tab.inactive} hover:opacity-80`;
+            });
+        }
+
+        function loadLevel(level) {
+            currentLevel = level;
+            updateTabStyles();
+            
+            const data = levelsData[level];
+            document.getElementById('level-desc').textContent = data.desc;
+            
+            totalPairs = data.pairs.length;
+            matchedCount = 0;
+            selectedLeft = null;
+            selectedRight = null;
+            
+            document.getElementById('victory-screen').classList.add('hidden');
+            
+            const leftCol = document.getElementById('left-column');
+            const rightCol = document.getElementById('right-column');
+            leftCol.innerHTML = '';
+            rightCol.innerHTML = '';
+
+            const leftItems = shuffle([...data.pairs]);
+            const rightItems = shuffle([...data.pairs]);
+
+            const getThemeClasses = () => {
+                if(level === 1) return 'bg-white border-blue-200 text-blue-800 shadow-blue-100';
+                if(level === 2) return 'bg-white border-purple-200 text-purple-800 shadow-purple-100';
+                return 'bg-white border-rose-200 text-rose-800 shadow-rose-100';
+            };
+
+            leftItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = `p-4 border-2 rounded-xl cursor-pointer text-lg md:text-xl font-medium shadow-sm transition-all text-center select-none ${getThemeClasses()}`;
+                div.innerHTML = `<div class="pointer-events-none">${item.left}</div>`;
+                div.dataset.id = item.id;
+                div.dataset.side = 'left';
+                div.onclick = () => handleSelect(div, 'left');
+                leftCol.appendChild(div);
+            });
+
+            rightItems.forEach(item => {
+                const div = document.createElement('div');
+                div.className = `p-4 border-2 rounded-xl cursor-pointer text-base md:text-lg shadow-sm transition-all select-none flex flex-col justify-center items-center text-center ${getThemeClasses()}`;
+                div.innerHTML = `<div class="pointer-events-none">${item.right}</div><div class="hint text-sm mt-2 font-bold text-green-700 opacity-0 transition-opacity h-0 overflow-hidden">${item.hint}</div>`;
+                div.dataset.id = item.id;
+                div.dataset.side = 'right';
+                div.onclick = () => handleSelect(div, 'right');
+                rightCol.appendChild(div);
+            });
+        }
+
+        function handleSelect(element, side) {
+            if (element.classList.contains('matched')) return;
+
+            // 移除同側的選取狀態
+            const colId = side === 'left' ? 'left-column' : 'right-column';
+            Array.from(document.getElementById(colId).children).forEach(child => {
+                if (!child.classList.contains('matched')) {
+                    child.classList.remove('selected');
+                }
+            });
+
+            element.classList.remove('wrong');
+            element.classList.add('selected');
+
+            if (side === 'left') selectedLeft = element;
+            else selectedRight = element;
+
+            if (selectedLeft && selectedRight) {
+                checkMatch();
+            }
+        }
+
+        function checkMatch() {
+            const leftId = selectedLeft.dataset.id;
+            const rightId = selectedRight.dataset.id;
+
+            if (leftId === rightId) {
+                // 配對成功
+                selectedLeft.classList.remove('selected');
+                selectedRight.classList.remove('selected');
+                selectedLeft.classList.add('matched');
+                selectedRight.classList.add('matched');
+                
+                // 顯示右側提示
+                const hint = selectedRight.querySelector('.hint');
+                hint.classList.remove('opacity-0', 'h-0');
+                hint.classList.add('opacity-100', 'h-auto', 'mt-2');
+
+                matchedCount++;
+                selectedLeft = null;
+                selectedRight = null;
+
+                if (matchedCount === totalPairs) {
+                    setTimeout(showVictory, 500);
+                }
+            } else {
+                // 配對失敗
+                const l = selectedLeft;
+                const r = selectedRight;
+                l.classList.remove('selected');
+                r.classList.remove('selected');
+                l.classList.add('wrong', 'shake');
+                r.classList.add('wrong', 'shake');
+                
+                setTimeout(() => {
+                    l.classList.remove('wrong', 'shake');
+                    r.classList.remove('wrong', 'shake');
+                }, 500);
+
+                selectedLeft = null;
+                selectedRight = null;
+            }
+        }
+
+        function showVictory() {
+            const screen = document.getElementById('victory-screen');
+            const btn = document.getElementById('next-level-btn');
+            const title = document.getElementById('victory-title');
+            const msg = document.getElementById('victory-msg');
+            const expertBadge = document.getElementById('expert-badge');
+            const normalEmoji = document.getElementById('normal-emoji');
+            
+            screen.classList.remove('hidden');
+            screen.classList.add('flex');
+
+            if(currentLevel < 3) {
+                expertBadge.classList.add('hidden');
+                expertBadge.classList.remove('flex');
+                normalEmoji.classList.remove('hidden');
+                title.textContent = '太棒了！';
+                msg.textContent = `您已完美通過第 ${currentLevel} 關！`;
+                btn.textContent = '前往下一關';
+                btn.onclick = () => loadLevel(currentLevel + 1);
+            } else {
+                // 第三關全破
+                normalEmoji.classList.add('hidden');
+                expertBadge.classList.remove('hidden');
+                expertBadge.classList.add('flex');
+                
+                title.textContent = '終極挑戰成功！';
+                msg.textContent = '您已經精通了五、六年級的古詩詞，獲得「詩詞小專家」榮譽稱號！';
+                btn.textContent = '重新挑戰第一關';
+                btn.className = "w-full py-3 rounded-xl font-bold text-white bg-green-500 hover:bg-green-600 shadow-md transition-colors mt-4";
+                btn.onclick = () => loadLevel(1);
+            }
+        }
+
+        // 初始化載入第一關
+        loadLevel(1);
+    </script>
+</body>
+</html>
